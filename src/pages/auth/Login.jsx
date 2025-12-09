@@ -5,17 +5,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { useForm } from "react-hook-form";
-import {
-  Box,
-  Card,
-  CardContent,
-  TextField,
-  Button,
-  Typography,
-  Container,
-  Alert,
-  CircularProgress,
-} from "@mui/material";
+import { Box, Card, CardContent, Typography, Container } from "@mui/material";
 import { toast } from "react-toastify";
 
 import { loginUser } from "../../services/authService";
@@ -25,15 +15,11 @@ import {
   loginFailure,
 } from "../../redux/slices/authSlice";
 
-// ===============================================
-// VALIDATION PATTERNS (Regex)
-// ===============================================
-const VALIDATION_PATTERNS = {
-  email: {
-    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-    message: "Please enter a valid email address",
-  },
-};
+// Import reusable form components
+import FormTextField from "../../components/common/FormTextField";
+import FormSubmitButton from "../../components/common/FormSubmitButton";
+import FormAlert from "../../components/common/FormAlert";
+import { VALIDATION_RULES } from "../../constants/formConstants";
 
 function Login() {
   const navigate = useNavigate();
@@ -101,67 +87,35 @@ function Login() {
               Login to your account
             </Typography>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
+            <FormAlert message={error} severity="error" />
 
             <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-              <TextField
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: VALIDATION_PATTERNS.email,
-                })}
+              <FormTextField
+                register={register}
+                name="email"
+                validation={VALIDATION_RULES.email}
+                errors={errors}
                 label="Email Address"
                 type="email"
-                fullWidth
-                margin="normal"
-                error={!!errors.email}
-                helperText={errors.email?.message}
                 autoComplete="email"
                 autoFocus
               />
 
-              <TextField
-                {...register("password", {
-                  required: "Password is required",
-                  minLength: {
-                    value: 6,
-                    message: "Password must be at least 6 characters",
-                  },
-                  pattern: {
-                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/,
-                    message:
-                      "Password must contain uppercase, lowercase, and number",
-                  },
-                })}
+              <FormTextField
+                register={register}
+                name="password"
+                validation={VALIDATION_RULES.password}
+                errors={errors}
                 label="Password"
                 type="password"
-                fullWidth
-                margin="normal"
-                error={!!errors.password}
-                helperText={errors.password?.message}
                 autoComplete="current-password"
               />
 
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                size="large"
-                disabled={isSubmitting}
-                sx={{ mt: 3, mb: 2 }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Logging in...
-                  </>
-                ) : (
-                  "Login"
-                )}
-              </Button>
+              <FormSubmitButton
+                isSubmitting={isSubmitting}
+                label="Login"
+                loadingLabel="Logging in..."
+              />
 
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="body2">
