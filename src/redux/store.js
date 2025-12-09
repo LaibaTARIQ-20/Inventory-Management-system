@@ -15,6 +15,9 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false, // For Firebase timestamps
+      serializableCheck: {
+        ignoredActions: ["products/setProducts", "orders/setOrders"],
+        ignoredPaths: ["products.items", "orders.items"],
+      },
     }),
 });
