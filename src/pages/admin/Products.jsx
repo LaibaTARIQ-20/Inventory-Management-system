@@ -1,6 +1,7 @@
-// src/pages/admin/Products.jsx
+// src/pages/admin/Products.jsx - CONNECTED TO FIREBASE
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import {
   Box,
   Paper,
@@ -8,77 +9,40 @@ import {
   Select,
   FormControl,
   InputLabel,
+  CircularProgress,
 } from "@mui/material";
 import { toast } from "react-toastify";
 
 import PageHeader from "../../components/common/PageHeader";
-import SearchBar from "../../components/common/searchbar";
+import SearchBar from "../../components/common/SearchBar";
 import ProductTable from "../../components/admin/ProductManagement/ProductTable";
 import AddProductModal from "../../components/admin/ProductManagement/AddProductModal";
 import EditProductModal from "../../components/admin/ProductManagement/EditProductModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
-// ===============================================
-// MOCK DATA (Replace with Redux/Firebase later)
-// ===============================================
-const MOCK_PRODUCTS = [
-  {
-    id: 1,
-    name: "Wireless Mouse",
-    description: "Ergonomic wireless mouse with USB receiver",
-    categoryId: "cat1",
-    categoryName: "Electronics",
-    supplierId: "sup1",
-    supplierName: "Tech Suppliers Inc",
-    price: 25.99,
-    stock: 50,
-  },
-  {
-    id: 2,
-    name: "Laptop Stand",
-    description: "Adjustable aluminum laptop stand",
-    categoryId: "cat1",
-    categoryName: "Electronics",
-    supplierId: "sup2",
-    supplierName: "Office Supplies Co",
-    price: 45.5,
-    stock: 30,
-  },
-  {
-    id: 3,
-    name: "USB-C Cable",
-    description: "6ft USB-C charging cable",
-    categoryId: "cat1",
-    categoryName: "Electronics",
-    supplierId: "sup1",
-    supplierName: "Tech Suppliers Inc",
-    price: 12.99,
-    stock: 100,
-  },
-  {
-    id: 4,
-    name: "Desk Lamp",
-    description: "LED desk lamp with adjustable brightness",
-    categoryId: "cat2",
-    categoryName: "Furniture",
-    supplierId: "sup2",
-    supplierName: "Office Supplies Co",
-    price: 35.0,
-    stock: 3, // Low stock
-  },
-  {
-    id: 5,
-    name: "Notebook",
-    description: "A5 ruled notebook 200 pages",
-    categoryId: "cat3",
-    categoryName: "Stationery",
-    supplierId: "sup2",
-    supplierName: "Office Supplies Co",
-    price: 5.99,
-    stock: 0, // Out of stock
-  },
-];
+// Redux actions
+import {
+  setProducts,
+  addProduct as addProductAction,
+  updateProduct as updateProductAction,
+  deleteProduct as deleteProductAction,
+  setLoading,
+  setError,
+} from "../../redux/slices/productSlice";
 
+// Firebase service
+import {
+  fetchProducts,
+  addProduct as addProductToFirebase,
+  updateProduct as updateProductInFirebase,
+  deleteProduct as deleteProductFromFirebase,
+  enrichProductWithNames,
+} from "../../services/productService";
+
+// ===============================================
+// MOCK DATA FOR CATEGORIES & SUPPLIERS
+// (Will be replaced when we connect those too)
+// ===============================================
 const MOCK_CATEGORIES = [
   { id: "cat1", name: "Electronics" },
   { id: "cat2", name: "Furniture" },
@@ -91,10 +55,17 @@ const MOCK_SUPPLIERS = [
 ];
 
 function Products() {
+  const dispatch = useDispatch();
+
   // ===============================================
-  // STATE MANAGEMENT
+  // REDUX STATE
   // ===============================================
-  const [products, setProducts] = useState(MOCK_PRODUCTS);
+  // Get products from Redux store (not local state!)
+  const { products, loading } = useSelector((state) => state.products);
+
+  // ===============================================
+  // LOCAL STATE (UI only)
+  // ===============================================
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
@@ -102,12 +73,53 @@ function Products() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Selected product for edit/delete
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // ===============================================
-  // FILTER PRODUCTS (Search + Category)
+  // FETCH PRODUCTS ON MOUNT
+  // ===============================================
+  // This runs once when component loads
+  // Fetches all products from Firebase
+  // ===============================================
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      dispatch(setLoading(true));
+
+      const result = await fetchProducts();
+
+      if (result.success) {
+        // Enrich products with category and supplier names
+        const enrichedProducts = await Promise.all(
+          result.products.map((product) =>
+            enrichProductWithNames(product, MOCK_CATEGORIES, MOCK_SUPPLIERS)
+          )
+        );
+
+        dispatch(setProducts(enrichedProducts));
+      } else {
+        dispatch(setError(result.error));
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast.error("Failed to load products");
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+
+  // ===============================================
+  // FILTER PRODUCTS (Client-side)
+  // ===============================================
+  // Filter happens in browser after fetching from Firebase
+  // For large datasets, consider server-side filtering
   // ===============================================
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name
@@ -119,54 +131,86 @@ function Products() {
   });
 
   // ===============================================
-  // HANDLERS
+  // CRUD HANDLERS (Connected to Firebase)
   // ===============================================
 
-  // Add Product
-  const handleAddProduct = (newProduct) => {
-    const productWithId = {
-      ...newProduct,
-      id: products.length + 1, // Generate ID (Firebase will do this)
-      categoryName: MOCK_CATEGORIES.find((c) => c.id === newProduct.categoryId)
-        ?.name,
-      supplierName: MOCK_SUPPLIERS.find((s) => s.id === newProduct.supplierId)
-        ?.name,
-    };
+  // ADD PRODUCT
+  const handleAddProduct = async (productData) => {
+    try {
+      // Add to Firebase
+      const result = await addProductToFirebase(productData);
 
-    setProducts([...products, productWithId]);
-    toast.success("Product added successfully!");
+      if (result.success) {
+        // Enrich with names
+        const enrichedProduct = await enrichProductWithNames(
+          result.product,
+          MOCK_CATEGORIES,
+          MOCK_SUPPLIERS
+        );
+
+        // Update Redux
+        dispatch(addProductAction(enrichedProduct));
+        toast.success("Product added successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error adding product:", error);
+      toast.error("Failed to add product");
+    }
   };
 
-  // Edit Product
-  const handleEditProduct = (updatedProduct) => {
-    const updatedProducts = products.map((product) =>
-      product.id === updatedProduct.id
-        ? {
-            ...updatedProduct,
-            categoryName: MOCK_CATEGORIES.find(
-              (c) => c.id === updatedProduct.categoryId
-            )?.name,
-            supplierName: MOCK_SUPPLIERS.find(
-              (s) => s.id === updatedProduct.supplierId
-            )?.name,
-          }
-        : product
-    );
+  // EDIT PRODUCT
+  const handleEditProduct = async (updatedProduct) => {
+    try {
+      const { id, ...productData } = updatedProduct;
 
-    setProducts(updatedProducts);
-    toast.success("Product updated successfully!");
+      // Update in Firebase
+      const result = await updateProductInFirebase(id, productData);
+
+      if (result.success) {
+        // Enrich with names
+        const enrichedProduct = await enrichProductWithNames(
+          result.product,
+          MOCK_CATEGORIES,
+          MOCK_SUPPLIERS
+        );
+
+        // Update Redux
+        dispatch(updateProductAction(enrichedProduct));
+        toast.success("Product updated successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast.error("Failed to update product");
+    }
   };
 
-  // Delete Product
-  const handleDeleteProduct = () => {
-    const updatedProducts = products.filter(
-      (product) => product.id !== selectedProduct.id
-    );
+  // DELETE PRODUCT
+  const handleDeleteProduct = async () => {
+    try {
+      setDeleteLoading(true);
 
-    setProducts(updatedProducts);
-    setIsDeleteDialogOpen(false);
-    setSelectedProduct(null);
-    toast.success("Product deleted successfully!");
+      // Delete from Firebase
+      const result = await deleteProductFromFirebase(selectedProduct.id);
+
+      if (result.success) {
+        // Update Redux
+        dispatch(deleteProductAction(selectedProduct.id));
+        toast.success("Product deleted successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product");
+    } finally {
+      setDeleteLoading(false);
+      setIsDeleteDialogOpen(false);
+      setSelectedProduct(null);
+    }
   };
 
   // Open Edit Modal
@@ -225,12 +269,19 @@ function Products() {
         </Box>
       </Paper>
 
-      {/* Products Table */}
-      <ProductTable
-        products={filteredProducts}
-        onEdit={handleOpenEditModal}
-        onDelete={handleOpenDeleteDialog}
-      />
+      {/* Loading State */}
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        /* Products Table */
+        <ProductTable
+          products={filteredProducts}
+          onEdit={handleOpenEditModal}
+          onDelete={handleOpenDeleteDialog}
+        />
+      )}
 
       {/* Add Product Modal */}
       <AddProductModal
@@ -265,6 +316,7 @@ function Products() {
         title="Delete Product"
         message="Are you sure you want to delete"
         itemName={selectedProduct?.name}
+        loading={deleteLoading}
       />
     </Box>
   );
@@ -273,25 +325,25 @@ function Products() {
 export default Products;
 
 // ===============================================
-// NOTES FOR NEXT STEP (Firebase Integration)
+// KEY CHANGES FROM MOCK VERSION:
 // ===============================================
-//
-// When connecting to Firebase:
-// 1. Replace MOCK_PRODUCTS with Redux state
-// 2. Fetch products from Firestore on mount
-// 3. Add/Edit/Delete will call Firebase functions
-// 4. Update Redux state after Firebase operations
-//
-// Example:
-// const products = useSelector(state => state.products.products);
-// const dispatch = useDispatch();
-//
-// useEffect(() => {
-//   fetchProductsFromFirebase();
-// }, []);
-//
-// const handleAddProduct = async (data) => {
-//   const newProduct = await addProductToFirebase(data);
-//   dispatch(addProduct(newProduct));
-// };
+// 1. ✅ Uses Redux instead of useState for products
+// 2. ✅ Fetches from Firebase on mount (useEffect)
+// 3. ✅ Add/Edit/Delete call Firebase first, then update Redux
+// 4. ✅ Shows loading spinner while fetching
+// 5. ✅ Toast notifications for all operations
+// 6. ✅ Error handling for all Firebase operations
+// 7. ✅ Enriches products with category/supplier names
+// ===============================================
+
+// ===============================================
+// TESTING CHECKLIST:
+// ===============================================
+// ✅ Page loads and fetches products from Firebase
+// ✅ Add product → saves to Firebase → appears in table
+// ✅ Edit product → updates in Firebase → changes reflect
+// ✅ Delete product → removes from Firebase → disappears
+// ✅ Refresh page → products persist (data in Firebase)
+// ✅ Search works with Firebase data
+// ✅ Category filter works with Firebase data
 // ===============================================

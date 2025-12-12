@@ -1,100 +1,134 @@
-// src/pages/admin/Suppliers.jsx
+// src/pages/admin/Suppliers.jsx - CONNECTED TO FIREBASE
 
-import { useState } from "react";
-import { Box, Paper } from "@mui/material";
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { Box, Paper, CircularProgress } from "@mui/material";
 import { toast } from "react-toastify";
 
 import PageHeader from "../../components/common/PageHeader";
-import SearchBar from "../../components/common/searchbar";
+import SearchBar from "../../components/common/SearchBar";
 import SuppliersTable from "../../components/admin/SupplierManagement/SuppliersTable";
 import AddSupplierModal from "../../components/admin/SupplierManagement/AddSupplierModal";
 import EditSupplierModal from "../../components/admin/SupplierManagement/EditSupplierModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
-// ===============================================
-// MOCK DATA (Replace with Redux/Firebase later)
-// ===============================================
-const MOCK_SUPPLIERS = [
-  {
-    id: 1,
-    name: "Tech Suppliers Inc",
-    email: "contact@techsuppliers.com",
-    phone: "1234567890",
-    address: "123 Tech Street, Silicon Valley, CA 94025",
-  },
-  {
-    id: 2,
-    name: "Office Supplies Co",
-    email: "info@officesupplies.com",
-    phone: "0987654321",
-    address: "456 Office Avenue, New York, NY 10001",
-  },
-  {
-    id: 3,
-    name: "Global Electronics Ltd",
-    email: "sales@globalelectronics.com",
-    phone: "5551234567",
-    address: "789 Electronics Blvd, Austin, TX 78701",
-  },
-];
+// Redux actions
+import {
+  setSuppliers,
+  addSupplier as addSupplierAction,
+  updateSupplier as updateSupplierAction,
+  deleteSupplier as deleteSupplierAction,
+  setSupplierLoading,
+  setSupplierError,
+} from "../../redux/slices/supplierSlice";
+
+// Firebase service
+import {
+  fetchSuppliers,
+  addSupplier as addSupplierToFirebase,
+  updateSupplier as updateSupplierInFirebase,
+  deleteSupplier as deleteSupplierFromFirebase,
+} from "../../services/supplierService";
 
 function Suppliers() {
-  // ===============================================
-  // STATE MANAGEMENT
-  // ===============================================
-  const [suppliers, setSuppliers] = useState(MOCK_SUPPLIERS);
-  const [searchQuery, setSearchQuery] = useState("");
+  const dispatch = useDispatch();
 
-  // Modal states
+  // Redux state
+  const { suppliers, loading } = useSelector((state) => state.suppliers);
+
+  // Local state
+  const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
-  // Selected supplier for edit/delete
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
 
-  // ===============================================
-  // FILTER SUPPLIERS (Search)
-  // ===============================================
+  // Fetch suppliers on mount
+  useEffect(() => {
+    loadSuppliers();
+  }, []);
+
+  const loadSuppliers = async () => {
+    try {
+      dispatch(setSupplierLoading(true));
+
+      const result = await fetchSuppliers();
+
+      if (result.success) {
+        dispatch(setSuppliers(result.suppliers));
+      } else {
+        dispatch(setSupplierError(result.error));
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error loading suppliers:", error);
+      toast.error("Failed to load suppliers");
+    } finally {
+      dispatch(setSupplierLoading(false));
+    }
+  };
+
+  // Filter suppliers
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ===============================================
-  // HANDLERS
-  // ===============================================
+  // CRUD Handlers
+  const handleAddSupplier = async (supplierData) => {
+    try {
+      const result = await addSupplierToFirebase(supplierData);
 
-  // Add Supplier
-  const handleAddSupplier = (newSupplier) => {
-    const supplierWithId = {
-      ...newSupplier,
-      id: suppliers.length + 1, // Generate ID (Firebase will do this)
-    };
-
-    setSuppliers([...suppliers, supplierWithId]);
-    toast.success("Supplier added successfully!");
+      if (result.success) {
+        dispatch(addSupplierAction(result.supplier));
+        toast.success("Supplier added successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error adding supplier:", error);
+      toast.error("Failed to add supplier");
+    }
   };
 
-  // Edit Supplier
-  const handleEditSupplier = (updatedSupplier) => {
-    const updatedSuppliers = suppliers.map((supplier) =>
-      supplier.id === updatedSupplier.id ? updatedSupplier : supplier
-    );
+  const handleEditSupplier = async (updatedSupplier) => {
+    try {
+      const { id, ...supplierData } = updatedSupplier;
 
-    setSuppliers(updatedSuppliers);
-    toast.success("Supplier updated successfully!");
+      const result = await updateSupplierInFirebase(id, supplierData);
+
+      if (result.success) {
+        dispatch(updateSupplierAction(result.supplier));
+        toast.success("Supplier updated successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      toast.error("Failed to update supplier");
+    }
   };
 
-  // Delete Supplier
-  const handleDeleteSupplier = () => {
-    const updatedSuppliers = suppliers.filter(
-      (supplier) => supplier.id !== selectedSupplier.id
-    );
+  const handleDeleteSupplier = async () => {
+    try {
+      setDeleteLoading(true);
 
-    setSuppliers(updatedSuppliers);
-    setIsDeleteDialogOpen(false);
-    setSelectedSupplier(null);
-    toast.success("Supplier deleted successfully!");
+      const result = await deleteSupplierFromFirebase(selectedSupplier.id);
+
+      if (result.success) {
+        dispatch(deleteSupplierAction(selectedSupplier.id));
+        toast.success("Supplier deleted successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      toast.error("Failed to delete supplier");
+    } finally {
+      setDeleteLoading(false);
+      setIsDeleteDialogOpen(false);
+      setSelectedSupplier(null);
+    }
   };
 
   // Open Edit Modal
@@ -132,12 +166,19 @@ function Suppliers() {
         />
       </Paper>
 
-      {/* Suppliers Table */}
-      <SuppliersTable
-        suppliers={filteredSuppliers}
-        onEdit={handleOpenEditModal}
-        onDelete={handleOpenDeleteDialog}
-      />
+      {/* Loading State */}
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        /* Suppliers Table */
+        <SuppliersTable
+          suppliers={filteredSuppliers}
+          onEdit={handleOpenEditModal}
+          onDelete={handleOpenDeleteDialog}
+        />
+      )}
 
       {/* Add Supplier Modal */}
       <AddSupplierModal
@@ -168,6 +209,7 @@ function Suppliers() {
         title="Delete Supplier"
         message="Are you sure you want to delete"
         itemName={selectedSupplier?.name}
+        loading={deleteLoading}
       />
     </Box>
   );

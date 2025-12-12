@@ -1,99 +1,138 @@
-// src/pages/admin/Categories.jsx
+// src/pages/admin/Categories.jsx - CONNECTED TO FIREBASE
 
-import { useState } from "react";
-import { Box, Paper } from "@mui/material";
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { Box, Paper, CircularProgress } from "@mui/material";
 import { toast } from "react-toastify";
 
 import PageHeader from "../../components/common/PageHeader";
-import SearchBar from "../../components/common/searchbar";
+import SearchBar from "../../components/common/SearchBar";
 import CategoriesTable from "../../components/admin/CategoryManagement/CategoriesTable";
 import AddCategoryModal from "../../components/admin/CategoryManagement/AddCategoryModal";
 import EditCategoryModal from "../../components/admin/CategoryManagement/EditCategoryModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
-// ===============================================
-// MOCK DATA (Replace with Redux/Firebase later)
-// ===============================================
-const MOCK_CATEGORIES = [
-  {
-    id: 1,
-    name: "Electronics",
-    description: "Electronic devices and accessories",
-  },
-  {
-    id: 2,
-    name: "Furniture",
-    description: "Office and home furniture items",
-  },
-  {
-    id: 3,
-    name: "Stationery",
-    description: "Office supplies and stationery products",
-  },
-  {
-    id: 4,
-    name: "Clothing",
-    description: "Apparel and fashion items",
-  },
-];
+// Redux actions
+import {
+  setCategories,
+  addCategory as addCategoryAction,
+  updateCategory as updateCategoryAction,
+  deleteCategory as deleteCategoryAction,
+  setCategoryLoading,
+  setCategoryError,
+} from "../../redux/slices/categorySlice";
+
+// Firebase service
+import {
+  fetchCategories,
+  addCategory as addCategoryToFirebase,
+  updateCategory as updateCategoryInFirebase,
+  deleteCategory as deleteCategoryFromFirebase,
+} from "../../services/categoryService";
 
 function Categories() {
-  // ===============================================
-  // STATE MANAGEMENT
-  // ===============================================
-  const [categories, setCategories] = useState(MOCK_CATEGORIES);
+  const dispatch = useDispatch();
+
+  // Redux state
+  const { categories, loading } = useSelector((state) => state.categories);
+
+  // Local state
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Selected category for edit/delete
+  // Selected category
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  // ===============================================
-  // FILTER CATEGORIES (Search)
-  // ===============================================
+  // Fetch categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      dispatch(setCategoryLoading(true));
+
+      const result = await fetchCategories();
+
+      if (result.success) {
+        dispatch(setCategories(result.categories));
+      } else {
+        dispatch(setCategoryError(result.error));
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast.error("Failed to load categories");
+    } finally {
+      dispatch(setCategoryLoading(false));
+    }
+  };
+
+  // Filter categories
   const filteredCategories = categories.filter((category) =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ===============================================
-  // HANDLERS
-  // ===============================================
+  // CRUD Handlers
+  const handleAddCategory = async (categoryData) => {
+    try {
+      const result = await addCategoryToFirebase(categoryData);
 
-  // Add Category
-  const handleAddCategory = (newCategory) => {
-    const categoryWithId = {
-      ...newCategory,
-      id: categories.length + 1, // Generate ID (Firebase will do this)
-    };
-
-    setCategories([...categories, categoryWithId]);
-    toast.success("Category added successfully!");
+      if (result.success) {
+        dispatch(addCategoryAction(result.category));
+        toast.success("Category added successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      toast.error("Failed to add category");
+    }
   };
 
-  // Edit Category
-  const handleEditCategory = (updatedCategory) => {
-    const updatedCategories = categories.map((category) =>
-      category.id === updatedCategory.id ? updatedCategory : category
-    );
+  const handleEditCategory = async (updatedCategory) => {
+    try {
+      const { id, ...categoryData } = updatedCategory;
 
-    setCategories(updatedCategories);
-    toast.success("Category updated successfully!");
+      const result = await updateCategoryInFirebase(id, categoryData);
+
+      if (result.success) {
+        dispatch(updateCategoryAction(result.category));
+        toast.success("Category updated successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error updating category:", error);
+      toast.error("Failed to update category");
+    }
   };
 
-  // Delete Category
-  const handleDeleteCategory = () => {
-    const updatedCategories = categories.filter(
-      (category) => category.id !== selectedCategory.id
-    );
+  const handleDeleteCategory = async () => {
+    try {
+      setDeleteLoading(true);
 
-    setCategories(updatedCategories);
-    setIsDeleteDialogOpen(false);
-    setSelectedCategory(null);
-    toast.success("Category deleted successfully!");
+      const result = await deleteCategoryFromFirebase(selectedCategory.id);
+
+      if (result.success) {
+        dispatch(deleteCategoryAction(selectedCategory.id));
+        toast.success("Category deleted successfully!");
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast.error("Failed to delete category");
+    } finally {
+      setDeleteLoading(false);
+      setIsDeleteDialogOpen(false);
+      setSelectedCategory(null);
+    }
   };
 
   // Open Edit Modal
@@ -131,12 +170,19 @@ function Categories() {
         />
       </Paper>
 
-      {/* Categories Table */}
-      <CategoriesTable
-        categories={filteredCategories}
-        onEdit={handleOpenEditModal}
-        onDelete={handleOpenDeleteDialog}
-      />
+      {/* Loading State */}
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        /* Categories Table */
+        <CategoriesTable
+          categories={filteredCategories}
+          onEdit={handleOpenEditModal}
+          onDelete={handleOpenDeleteDialog}
+        />
+      )}
 
       {/* Add Category Modal */}
       <AddCategoryModal
@@ -167,6 +213,7 @@ function Categories() {
         title="Delete Category"
         message="Are you sure you want to delete"
         itemName={selectedCategory?.name}
+        loading={deleteLoading}
       />
     </Box>
   );
