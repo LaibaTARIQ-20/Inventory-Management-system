@@ -1,7 +1,7 @@
 // src/components/admin/ProductManagement/EditProductModal.jsx
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useEffect } from "react";
 import { Box } from "@mui/material";
 import { toast } from "react-toastify";
 
@@ -9,18 +9,12 @@ import ModalDialog from "../../common/ModalDialog";
 import FormTextField from "../../common/FormTextField";
 import FormSelectField from "../../common/FormSelectField";
 import FormSubmitButton from "../../common/FormSubmitButton";
+import ImageUpload from "../../common/ImageUpload";
+
+import { compressImage } from "../../../services/imageService";
 
 /**
- * Edit Product Modal Component
- * Form to edit an existing product
- *
- * @param {Object} props
- * @param {boolean} props.open - Modal open state
- * @param {Function} props.onClose - Close handler
- * @param {Function} props.onSubmit - Submit handler
- * @param {Object} props.product - Product to edit
- * @param {Array} props.categories - Array of categories
- * @param {Array} props.suppliers - Array of suppliers
+ * Edit Product Modal Component WITH IMAGE UPLOAD
  */
 const EditProductModal = ({
   open,
@@ -37,6 +31,11 @@ const EditProductModal = ({
     reset,
   } = useForm();
 
+  // Image state
+  const [selectedImage, setSelectedImage] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+
   // Pre-fill form when product changes
   useEffect(() => {
     if (product && open) {
@@ -48,16 +47,45 @@ const EditProductModal = ({
         categoryId: product.categoryId || "",
         supplierId: product.supplierId || "",
       });
+
+      // Set existing image
+      setSelectedImage(product.imageUrl || "");
+      setImagePreview(product.imageUrl || "");
     }
   }, [product, open, reset]);
+
+  const handleImageSelect = async (file) => {
+    try {
+      setImageUploading(true);
+
+      const result = await compressImage(file);
+
+      if (result.success) {
+        setSelectedImage(result.base64);
+        setImagePreview(result.base64);
+        toast.success("Image loaded successfully!");
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      toast.error(error.message || "Failed to process image");
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    setSelectedImage("");
+    setImagePreview("");
+  };
 
   const handleFormSubmit = async (data) => {
     try {
       const productData = {
         ...data,
-        id: product.id, // Keep the original ID
+        id: product.id,
         price: parseFloat(data.price),
         stock: parseInt(data.stock),
+        imageUrl: selectedImage, // Include updated/existing image
       };
 
       await onSubmit(productData);
@@ -71,6 +99,8 @@ const EditProductModal = ({
 
   const handleClose = () => {
     reset();
+    setSelectedImage("");
+    setImagePreview("");
     onClose();
   };
 
@@ -129,6 +159,14 @@ const EditProductModal = ({
       maxWidth="md"
     >
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)}>
+        {/* IMAGE UPLOAD COMPONENT */}
+        <ImageUpload
+          imageUrl={imagePreview}
+          onImageSelect={handleImageSelect}
+          onImageRemove={handleImageRemove}
+          loading={imageUploading}
+        />
+
         <FormTextField
           register={register}
           name="name"
@@ -195,7 +233,7 @@ const EditProductModal = ({
         />
 
         <FormSubmitButton
-          isSubmitting={isSubmitting}
+          isSubmitting={isSubmitting || imageUploading}
           label="Update Product"
           loadingLabel="Updating Product..."
         />

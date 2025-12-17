@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // src/pages/admin/Products.jsx - CONNECTED TO FIREBASE
 
 import { useState, useEffect } from "react";
@@ -39,29 +40,24 @@ import {
   enrichProductWithNames,
 } from "../../services/productService";
 
-// ===============================================
-// MOCK DATA FOR CATEGORIES & SUPPLIERS
-// (Will be replaced when we connect those too)
-// ===============================================
-const MOCK_CATEGORIES = [
-  { id: "cat1", name: "Electronics" },
-  { id: "cat2", name: "Furniture" },
-  { id: "cat3", name: "Stationery" },
-];
+// Import category and supplier services
+import { fetchCategories } from "../../services/categoryService";
 
-const MOCK_SUPPLIERS = [
-  { id: "sup1", name: "Tech Suppliers Inc" },
-  { id: "sup2", name: "Office Supplies Co" },
-];
+import { fetchSuppliers } from "../../services/supplierService";
+
+import { setCategories } from "../../redux/slices/categorySlice";
+
+import { setSuppliers } from "../../redux/slices/supplierSlice";
 
 function Products() {
   const dispatch = useDispatch();
 
   // ===============================================
-  // REDUX STATE
+  // REDUX STATE - Get from store (not mock data!)
   // ===============================================
-  // Get products from Redux store (not local state!)
   const { products, loading } = useSelector((state) => state.products);
+  const { categories } = useSelector((state) => state.categories);
+  const { suppliers } = useSelector((state) => state.suppliers);
 
   // ===============================================
   // LOCAL STATE (UI only)
@@ -79,14 +75,35 @@ function Products() {
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // ===============================================
-  // FETCH PRODUCTS ON MOUNT
-  // ===============================================
-  // This runs once when component loads
-  // Fetches all products from Firebase
+  // FETCH ALL DATA ON MOUNT
   // ===============================================
   useEffect(() => {
     loadProducts();
+    loadCategories();
+    loadSuppliers();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const result = await fetchCategories();
+      if (result.success) {
+        dispatch(setCategories(result.categories));
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const result = await fetchSuppliers();
+      if (result.success) {
+        dispatch(setSuppliers(result.suppliers));
+      }
+    } catch (error) {
+      console.error("Error loading suppliers:", error);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -98,7 +115,7 @@ function Products() {
         // Enrich products with category and supplier names
         const enrichedProducts = await Promise.all(
           result.products.map((product) =>
-            enrichProductWithNames(product, MOCK_CATEGORIES, MOCK_SUPPLIERS)
+            enrichProductWithNames(product, categories, suppliers)
           )
         );
 
@@ -144,8 +161,8 @@ function Products() {
         // Enrich with names
         const enrichedProduct = await enrichProductWithNames(
           result.product,
-          MOCK_CATEGORIES,
-          MOCK_SUPPLIERS
+          categories,
+          suppliers
         );
 
         // Update Redux
@@ -172,8 +189,8 @@ function Products() {
         // Enrich with names
         const enrichedProduct = await enrichProductWithNames(
           result.product,
-          MOCK_CATEGORIES,
-          MOCK_SUPPLIERS
+          categories,
+          suppliers
         );
 
         // Update Redux
@@ -259,7 +276,7 @@ function Products() {
               size="small"
             >
               <MenuItem value="">All Categories</MenuItem>
-              {MOCK_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <MenuItem key={category.id} value={category.id}>
                   {category.name}
                 </MenuItem>
@@ -288,8 +305,8 @@ function Products() {
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddProduct}
-        categories={MOCK_CATEGORIES}
-        suppliers={MOCK_SUPPLIERS}
+        categories={categories}
+        suppliers={suppliers}
       />
 
       {/* Edit Product Modal */}
@@ -301,8 +318,8 @@ function Products() {
         }}
         onSubmit={handleEditProduct}
         product={selectedProduct}
-        categories={MOCK_CATEGORIES}
-        suppliers={MOCK_SUPPLIERS}
+        categories={categories}
+        suppliers={suppliers}
       />
 
       {/* Delete Confirmation Dialog */}

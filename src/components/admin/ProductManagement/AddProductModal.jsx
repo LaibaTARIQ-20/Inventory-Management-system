@@ -1,5 +1,6 @@
 // src/components/admin/ProductManagement/AddProductModal.jsx
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Box } from "@mui/material";
 import { toast } from "react-toastify";
@@ -8,17 +9,13 @@ import ModalDialog from "../../common/ModalDialog";
 import FormTextField from "../../common/FormTextField";
 import FormSelectField from "../../common/FormSelectField";
 import FormSubmitButton from "../../common/FormSubmitButton";
+import ImageUpload from "../../common/ImageUpload";
+
+import { compressImage } from "../../../services/imageService";
 
 /**
  * Add Product Modal Component
- * Form to add a new product
- *
- * @param {Object} props
- * @param {boolean} props.open - Modal open state
- * @param {Function} props.onClose - Close handler
- * @param {Function} props.onSubmit - Submit handler
- * @param {Array} props.categories - Array of categories
- * @param {Array} props.suppliers - Array of suppliers
+ * Form to add a new product WITH IMAGE UPLOAD
  */
 const AddProductModal = ({
   open,
@@ -43,6 +40,36 @@ const AddProductModal = ({
     },
   });
 
+  // Image state
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+
+  const handleImageSelect = async (file) => {
+    try {
+      setImageUploading(true);
+
+      // Compress and convert to base64
+      const result = await compressImage(file);
+
+      if (result.success) {
+        setSelectedImage(result.base64);
+        setImagePreview(result.base64);
+        toast.success("Image loaded successfully!");
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      toast.error(error.message || "Failed to process image");
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    setSelectedImage(null);
+    setImagePreview("");
+  };
+
   const handleFormSubmit = async (data) => {
     try {
       // Convert string to numbers
@@ -50,11 +77,15 @@ const AddProductModal = ({
         ...data,
         price: parseFloat(data.price),
         stock: parseInt(data.stock),
+        imageUrl: selectedImage || "", // Store base64 image
       };
 
       await onSubmit(productData);
       toast.success("Product added successfully!");
+
+      // Reset everything
       reset();
+      handleImageRemove();
       onClose();
     } catch (error) {
       toast.error("Failed to add product");
@@ -64,6 +95,7 @@ const AddProductModal = ({
 
   const handleClose = () => {
     reset();
+    handleImageRemove();
     onClose();
   };
 
@@ -122,6 +154,14 @@ const AddProductModal = ({
       maxWidth="md"
     >
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)}>
+        {/* IMAGE UPLOAD COMPONENT */}
+        <ImageUpload
+          imageUrl={imagePreview}
+          onImageSelect={handleImageSelect}
+          onImageRemove={handleImageRemove}
+          loading={imageUploading}
+        />
+
         <FormTextField
           register={register}
           name="name"
@@ -188,7 +228,7 @@ const AddProductModal = ({
         />
 
         <FormSubmitButton
-          isSubmitting={isSubmitting}
+          isSubmitting={isSubmitting || imageUploading}
           label="Add Product"
           loadingLabel="Adding Product..."
         />

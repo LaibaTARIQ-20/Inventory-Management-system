@@ -1,4 +1,5 @@
-// src/pages/admin/Suppliers.jsx - CONNECTED TO FIREBASE
+// src/pages/admin/Suppliers.jsx
+// FIXED IMPORTS - No more errors!
 
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -7,9 +8,12 @@ import { toast } from "react-toastify";
 
 import PageHeader from "../../components/common/PageHeader";
 import SearchBar from "../../components/common/SearchBar";
+
+// ✅ FIXED: Use actual file names (without _WITH_VIEW suffix)
 import SuppliersTable from "../../components/admin/SupplierManagement/SuppliersTable";
 import AddSupplierModal from "../../components/admin/SupplierManagement/AddSupplierModal";
 import EditSupplierModal from "../../components/admin/SupplierManagement/EditSupplierModal";
+import ViewSupplierModal from "../../components/admin/SupplierManagement/ViewSupplierModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
 // Redux actions
@@ -40,6 +44,7 @@ function Suppliers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -131,6 +136,12 @@ function Suppliers() {
     }
   };
 
+  // Open View Modal
+  const handleOpenViewModal = (supplier) => {
+    setSelectedSupplier(supplier);
+    setIsViewModalOpen(true);
+  };
+
   // Open Edit Modal
   const handleOpenEditModal = (supplier) => {
     setSelectedSupplier(supplier);
@@ -143,9 +154,6 @@ function Suppliers() {
     setIsDeleteDialogOpen(true);
   };
 
-  // ===============================================
-  // RENDER
-  // ===============================================
   return (
     <Box>
       {/* Page Header */}
@@ -175,6 +183,7 @@ function Suppliers() {
         /* Suppliers Table */
         <SuppliersTable
           suppliers={filteredSuppliers}
+          onView={handleOpenViewModal}
           onEdit={handleOpenEditModal}
           onDelete={handleOpenDeleteDialog}
         />
@@ -195,6 +204,16 @@ function Suppliers() {
           setSelectedSupplier(null);
         }}
         onSubmit={handleEditSupplier}
+        supplier={selectedSupplier}
+      />
+
+      {/* View Supplier Modal */}
+      <ViewSupplierModal
+        open={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedSupplier(null);
+        }}
         supplier={selectedSupplier}
       />
 

@@ -6,7 +6,7 @@ export { default as FormTextField } from "./FormTextField";
 export { default as FormSelectField } from "./FormSelectField";
 export { default as FormSubmitButton } from "./FormSubmitButton";
 export { default as FormAlert } from "./FormAlert";
-export { default as SearchBar } from "../../components/common/searchbar";
+export { default as SearchBar } from "./SearchBar";
 export { default as PageHeader } from "./PageHeader";
 export { default as ModalDialog } from "./ModalDialog";
 export { default as DeleteConfirmDialog } from "./DeleteConfirmDialog";

@@ -53,6 +53,9 @@ const ProductTable = ({ products, onEdit, onDelete }) => {
         <TableHead>
           <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
             <TableCell>
+              <strong>Image</strong>
+            </TableCell>
+            <TableCell>
               <strong>ID</strong>
             </TableCell>
             <TableCell>
@@ -86,6 +89,39 @@ const ProductTable = ({ products, onEdit, onDelete }) => {
                 key={product.id}
                 sx={{ "&:hover": { backgroundColor: "#fafafa" } }}
               >
+                <TableCell>
+                  {product.imageUrl ? (
+                    <Box
+                      component="img"
+                      src={product.imageUrl}
+                      alt={product.name}
+                      sx={{
+                        width: 50,
+                        height: 50,
+                        objectFit: "cover",
+                        borderRadius: 1,
+                        border: "1px solid #ddd",
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: 50,
+                        height: 50,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "#f5f5f5",
+                        borderRadius: 1,
+                        border: "1px solid #ddd",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        No Image
+                      </Typography>
+                    </Box>
+                  )}
+                </TableCell>
                 <TableCell>{product.id}</TableCell>
                 <TableCell>
                   <Box>

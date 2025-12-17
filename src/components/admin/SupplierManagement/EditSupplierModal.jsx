@@ -1,25 +1,30 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // src/components/admin/SupplierManagement/EditSupplierModal.jsx
+// ✅ COMPLETELY FIXED VERSION
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useEffect } from "react";
-import { Box } from "@mui/material";
+import { Box, Divider, Typography } from "@mui/material";
 import { toast } from "react-toastify";
 
+// Common Components
 import ModalDialog from "../../common/ModalDialog";
 import FormTextField from "../../common/FormTextField";
 import FormSubmitButton from "../../common/FormSubmitButton";
 
+// ✅ CORRECT: Import LocationPicker from maps folder
+import LocationPicker from "../../maps/LocationPicker";
+
+// Validation Rules
+import { VALIDATION_RULES } from "../../../constants/formConstants";
+
 /**
- * Edit Supplier Modal Component
- * Form to edit an existing supplier
- *
- * @param {Object} props
- * @param {boolean} props.open - Modal open state
- * @param {Function} props.onClose - Close handler
- * @param {Function} props.onSubmit - Submit handler
- * @param {Object} props.supplier - Supplier to edit
+ * Edit Supplier Modal Component WITH MAP
+ * Form to edit an existing supplier with location update
  */
 const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
+  const [selectedLocation, setSelectedLocation] = useState(null);
+
   const {
     register,
     handleSubmit,
@@ -39,11 +44,26 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
     }
   }, [supplier, open, reset]);
 
+  // Set location when supplier changes (separate effect to avoid setState in effect warning)
+  useEffect(() => {
+    if (supplier?.lat && supplier?.lng && open) {
+      setSelectedLocation({
+        lat: supplier.lat,
+        lng: supplier.lng,
+      });
+    } else if (open) {
+      setSelectedLocation(null);
+    }
+  }, [supplier?.lat, supplier?.lng, open]);
+
   const handleFormSubmit = async (data) => {
     try {
+      // Combine form data with location
       const supplierData = {
         ...data,
-        id: supplier.id, // Keep the original ID
+        id: supplier.id,
+        lat: selectedLocation?.lat || null,
+        lng: selectedLocation?.lng || null,
       };
 
       await onSubmit(supplierData);
@@ -57,47 +77,8 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
 
   const handleClose = () => {
     reset();
+    setSelectedLocation(null);
     onClose();
-  };
-
-  // Validation rules
-  const validationRules = {
-    name: {
-      required: "Supplier name is required",
-      minLength: {
-        value: 2,
-        message: "Name must be at least 2 characters",
-      },
-      maxLength: {
-        value: 100,
-        message: "Name cannot exceed 100 characters",
-      },
-    },
-    email: {
-      required: "Email is required",
-      pattern: {
-        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-        message: "Please enter a valid email address",
-      },
-    },
-    phone: {
-      required: "Phone number is required",
-      pattern: {
-        value: /^[0-9]{10}$/,
-        message: "Phone number must be 10 digits",
-      },
-    },
-    address: {
-      required: "Address is required",
-      minLength: {
-        value: 10,
-        message: "Address must be at least 10 characters",
-      },
-      maxLength: {
-        value: 200,
-        message: "Address cannot exceed 200 characters",
-      },
-    },
   };
 
   return (
@@ -105,13 +86,18 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
       open={open}
       onClose={handleClose}
       title="Edit Supplier"
-      maxWidth="sm"
+      maxWidth="md"
     >
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)}>
+        {/* Basic Information */}
+        <Typography variant="subtitle2" color="primary" gutterBottom>
+          Basic Information
+        </Typography>
+
         <FormTextField
           register={register}
           name="name"
-          validation={validationRules.name}
+          validation={VALIDATION_RULES.name}
           errors={errors}
           label="Supplier Name"
           autoFocus
@@ -120,7 +106,7 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
         <FormTextField
           register={register}
           name="email"
-          validation={validationRules.email}
+          validation={VALIDATION_RULES.email}
           errors={errors}
           label="Email Address"
           type="email"
@@ -130,7 +116,7 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
         <FormTextField
           register={register}
           name="phone"
-          validation={validationRules.phone}
+          validation={VALIDATION_RULES.phone}
           errors={errors}
           label="Phone Number"
           type="tel"
@@ -139,11 +125,24 @@ const EditSupplierModal = ({ open, onClose, onSubmit, supplier }) => {
         <FormTextField
           register={register}
           name="address"
-          validation={validationRules.address}
+          validation={VALIDATION_RULES.address}
           errors={errors}
           label="Address"
           multiline
-          rows={3}
+          rows={2}
+        />
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Location Update */}
+        <Typography variant="subtitle2" color="primary" gutterBottom>
+          Update Supplier Location
+        </Typography>
+
+        <LocationPicker
+          initialLocation={selectedLocation}
+          onLocationSelect={setSelectedLocation}
+          label="Click on map to update supplier location"
         />
 
         <FormSubmitButton

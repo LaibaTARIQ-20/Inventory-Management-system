@@ -1,5 +1,7 @@
 // src/components/admin/SupplierManagement/SuppliersTable.jsx
+// FIXED: Changed supplier.location to supplier.lat && supplier.lng
 
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,123 +11,175 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Typography,
+  Tooltip,
   Box,
+  Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import PhoneIcon from "@mui/icons-material/Phone";
+import MapIcon from "@mui/icons-material/Map";
 
-/**
- * Suppliers Table Component
- * Displays suppliers in a table with edit/delete actions
- *
- * @param {Object} props
- * @param {Array} props.suppliers - Array of supplier objects
- * @param {Function} props.onEdit - Edit handler
- * @param {Function} props.onDelete - Delete handler
- */
+// Reusable Components
+import ModalDialog from "../../common/ModalDialog";
+import LocationDisplay from "../../maps/LocationDisplay";
+
 const SuppliersTable = ({ suppliers, onEdit, onDelete }) => {
-  // Empty state
+  const [viewLocationOpen, setViewLocationOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+
+  const handleViewLocation = (supplier) => {
+    setSelectedSupplier(supplier);
+    setViewLocationOpen(true);
+  };
+
+  const handleCloseLocationView = () => {
+    setViewLocationOpen(false);
+    setSelectedSupplier(null);
+  };
+
   if (!suppliers || suppliers.length === 0) {
     return (
-      <Paper sx={{ p: 4, textAlign: "center" }}>
+      <Box
+        sx={{
+          textAlign: "center",
+          py: 8,
+          bgcolor: "grey.50",
+          borderRadius: 1,
+        }}
+      >
         <Typography variant="h6" color="text.secondary">
           No suppliers found
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Add your first supplier to track product sources
+          Add your first supplier to get started
         </Typography>
-      </Paper>
+      </Box>
     );
   }
 
   return (
-    <TableContainer component={Paper}>
-      <Table sx={{ minWidth: 650 }}>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-            <TableCell sx={{ width: "5%" }}>
-              <strong>ID</strong>
-            </TableCell>
-            <TableCell sx={{ width: "20%" }}>
-              <strong>Name</strong>
-            </TableCell>
-            <TableCell sx={{ width: "20%" }}>
-              <strong>Contact</strong>
-            </TableCell>
-            <TableCell sx={{ width: "35%" }}>
-              <strong>Address</strong>
-            </TableCell>
-            <TableCell align="center" sx={{ width: "10%" }}>
-              <strong>Actions</strong>
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {suppliers.map((supplier) => (
-            <TableRow
-              key={supplier.id}
-              sx={{ "&:hover": { backgroundColor: "#fafafa" } }}
-            >
-              <TableCell>{supplier.id}</TableCell>
-              <TableCell>
-                <Typography variant="body2" fontWeight={500}>
-                  {supplier.name}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Box>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      mb: 0.5,
-                    }}
-                  >
-                    <EmailIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                    <Typography variant="body2" color="text.secondary">
-                      {supplier.email}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <PhoneIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                    <Typography variant="body2" color="text.secondary">
-                      {supplier.phone}
-                    </Typography>
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2" color="text.secondary">
-                  {supplier.address || "-"}
-                </Typography>
-              </TableCell>
-              <TableCell align="center">
-                <IconButton
-                  color="primary"
-                  size="small"
-                  onClick={() => onEdit(supplier)}
-                  title="Edit supplier"
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  color="error"
-                  size="small"
-                  onClick={() => onDelete(supplier)}
-                  title="Delete supplier"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+    <>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ bgcolor: "grey.100" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>ID</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Contact</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Address</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }} align="center">
+                Actions
               </TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {suppliers.map((supplier, index) => (
+              <TableRow
+                key={supplier.id}
+                sx={{
+                  "&:hover": { bgcolor: "action.hover" },
+                  cursor: "pointer",
+                }}
+              >
+                <TableCell>{index + 1}</TableCell>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={500}>
+                    {supplier.name}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
+                  >
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
+                      <EmailIcon sx={{ fontSize: 16, color: "primary.main" }} />
+                      <Typography variant="body2">{supplier.email}</Typography>
+                    </Box>
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
+                      <PhoneIcon sx={{ fontSize: 16, color: "success.main" }} />
+                      <Typography variant="body2">{supplier.phone}</Typography>
+                    </Box>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ maxWidth: 200 }}>
+                    {supplier.address}
+                  </Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Box
+                    sx={{ display: "flex", justifyContent: "center", gap: 0.5 }}
+                  >
+                    {/* View Location - ✅ FIXED: Check lat && lng instead of location */}
+                    {supplier.lat && supplier.lng && (
+                      <Tooltip title="View Location">
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => handleViewLocation(supplier)}
+                        >
+                          <MapIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+
+                    {/* Edit */}
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => onEdit(supplier)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+
+                    {/* Delete */}
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => onDelete(supplier.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* View Location Modal - ✅ FIXED: Pass initialLocation correctly */}
+      <ModalDialog
+        open={viewLocationOpen}
+        onClose={handleCloseLocationView}
+        title={
+          selectedSupplier ? `${selectedSupplier.name} - Location` : "Location"
+        }
+        maxWidth="md"
+      >
+        {selectedSupplier && selectedSupplier.lat && selectedSupplier.lng && (
+          <LocationDisplay
+            initialLocation={{
+              lat: selectedSupplier.lat,
+              lng: selectedSupplier.lng,
+            }}
+            title={selectedSupplier.name}
+            height="400px"
+            zoom={15}
+          />
+        )}
+      </ModalDialog>
+    </>
   );
 };
 

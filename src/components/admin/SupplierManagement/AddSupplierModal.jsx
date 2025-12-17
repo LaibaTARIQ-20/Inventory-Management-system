@@ -1,23 +1,29 @@
 // src/components/admin/SupplierManagement/AddSupplierModal.jsx
+// ✅ COMPLETELY FIXED VERSION
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Box } from "@mui/material";
+import { Box, Divider, Typography } from "@mui/material";
 import { toast } from "react-toastify";
 
+// Common Components
 import ModalDialog from "../../common/ModalDialog";
 import FormTextField from "../../common/FormTextField";
 import FormSubmitButton from "../../common/FormSubmitButton";
 
+// ✅ CORRECT: Import LocationPicker from maps folder
+import LocationPicker from "../../maps/LocationPicker";
+
+// Validation Rules
+import { VALIDATION_RULES } from "../../../constants/formConstants";
+
 /**
- * Add Supplier Modal Component
- * Form to add a new supplier
- *
- * @param {Object} props
- * @param {boolean} props.open - Modal open state
- * @param {Function} props.onClose - Close handler
- * @param {Function} props.onSubmit - Submit handler
+ * Add Supplier Modal Component WITH MAP
+ * Form to add a new supplier with location selection
  */
 const AddSupplierModal = ({ open, onClose, onSubmit }) => {
+  const [selectedLocation, setSelectedLocation] = useState(null);
+
   const {
     register,
     handleSubmit,
@@ -34,9 +40,27 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
 
   const handleFormSubmit = async (data) => {
     try {
-      await onSubmit(data);
+      // Combine form data with location
+      const supplierData = {
+        ...data,
+        lat: selectedLocation?.lat || null,
+        lng: selectedLocation?.lng || null,
+      };
+
+      // Show warning if no location selected
+      if (!selectedLocation) {
+        const confirmWithoutLocation = window.confirm(
+          "No location selected. Do you want to add supplier without map location?"
+        );
+        if (!confirmWithoutLocation) {
+          return;
+        }
+      }
+
+      await onSubmit(supplierData);
       toast.success("Supplier added successfully!");
       reset();
+      setSelectedLocation(null);
       onClose();
     } catch (error) {
       toast.error("Failed to add supplier");
@@ -46,47 +70,8 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
 
   const handleClose = () => {
     reset();
+    setSelectedLocation(null);
     onClose();
-  };
-
-  // Validation rules
-  const validationRules = {
-    name: {
-      required: "Supplier name is required",
-      minLength: {
-        value: 2,
-        message: "Name must be at least 2 characters",
-      },
-      maxLength: {
-        value: 100,
-        message: "Name cannot exceed 100 characters",
-      },
-    },
-    email: {
-      required: "Email is required",
-      pattern: {
-        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-        message: "Please enter a valid email address",
-      },
-    },
-    phone: {
-      required: "Phone number is required",
-      pattern: {
-        value: /^[0-9]{10}$/,
-        message: "Phone number must be 10 digits",
-      },
-    },
-    address: {
-      required: "Address is required",
-      minLength: {
-        value: 10,
-        message: "Address must be at least 10 characters",
-      },
-      maxLength: {
-        value: 200,
-        message: "Address cannot exceed 200 characters",
-      },
-    },
   };
 
   return (
@@ -94,13 +79,18 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
       open={open}
       onClose={handleClose}
       title="Add New Supplier"
-      maxWidth="sm"
+      maxWidth="md"
     >
       <Box component="form" onSubmit={handleSubmit(handleFormSubmit)}>
+        {/* Basic Information */}
+        <Typography variant="subtitle2" color="primary" gutterBottom>
+          Basic Information
+        </Typography>
+
         <FormTextField
           register={register}
           name="name"
-          validation={validationRules.name}
+          validation={VALIDATION_RULES.name}
           errors={errors}
           label="Supplier Name"
           autoFocus
@@ -109,7 +99,7 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
         <FormTextField
           register={register}
           name="email"
-          validation={validationRules.email}
+          validation={VALIDATION_RULES.email}
           errors={errors}
           label="Email Address"
           type="email"
@@ -119,7 +109,7 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
         <FormTextField
           register={register}
           name="phone"
-          validation={validationRules.phone}
+          validation={VALIDATION_RULES.phone}
           errors={errors}
           label="Phone Number"
           type="tel"
@@ -129,11 +119,24 @@ const AddSupplierModal = ({ open, onClose, onSubmit }) => {
         <FormTextField
           register={register}
           name="address"
-          validation={validationRules.address}
+          validation={VALIDATION_RULES.address}
           errors={errors}
           label="Address"
           multiline
-          rows={3}
+          rows={2}
+        />
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Location Selection */}
+        <Typography variant="subtitle2" color="primary" gutterBottom>
+          Supplier Location (Optional)
+        </Typography>
+
+        <LocationPicker
+          initialLocation={selectedLocation}
+          onLocationSelect={setSelectedLocation}
+          label="Click on map to select supplier location"
         />
 
         <FormSubmitButton
