@@ -10,6 +10,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import App from "./App.jsx";
+
 import { store } from "./redux/store";
 import { theme } from "./theme/muiTheme";
 import { initAuthListener } from "./services/authService";
