@@ -19,21 +19,14 @@ import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
 // Redux actions
 import {
-  setSuppliers,
+  fetchSuppliers as fetchSuppliersAction,
   addSupplier as addSupplierAction,
   updateSupplier as updateSupplierAction,
   deleteSupplier as deleteSupplierAction,
-  setSupplierLoading,
-  setSupplierError,
 } from "../../redux/slices/supplierSlice";
 
 // Firebase service
-import {
-  fetchSuppliers,
-  addSupplier as addSupplierToFirebase,
-  updateSupplier as updateSupplierInFirebase,
-  deleteSupplier as deleteSupplierFromFirebase,
-} from "../../services/supplierService";
+// (No longer needed - using Redux thunks instead)
 
 function Suppliers() {
   const dispatch = useDispatch();
@@ -58,21 +51,10 @@ function Suppliers() {
 
   const loadSuppliers = async () => {
     try {
-      dispatch(setSupplierLoading(true));
-
-      const result = await fetchSuppliers();
-
-      if (result.success) {
-        dispatch(setSuppliers(result.suppliers));
-      } else {
-        dispatch(setSupplierError(result.error));
-        toast.error(result.error);
-      }
+      const result = await dispatch(fetchSuppliersAction());
     } catch (error) {
       console.error("Error loading suppliers:", error);
       toast.error("Failed to load suppliers");
-    } finally {
-      dispatch(setSupplierLoading(false));
     }
   };
 
@@ -84,13 +66,12 @@ function Suppliers() {
   // CRUD Handlers
   const handleAddSupplier = async (supplierData) => {
     try {
-      const result = await addSupplierToFirebase(supplierData);
-
-      if (result.success) {
-        dispatch(addSupplierAction(result.supplier));
+      const result = await dispatch(addSupplierAction(supplierData));
+      if (result.payload) {
         toast.success("Supplier added successfully!");
+        setIsAddModalOpen(false);
       } else {
-        toast.error(result.error);
+        toast.error(result.payload || "Failed to add supplier");
       }
     } catch (error) {
       console.error("Error adding supplier:", error);
@@ -102,13 +83,15 @@ function Suppliers() {
     try {
       const { id, ...supplierData } = updatedSupplier;
 
-      const result = await updateSupplierInFirebase(id, supplierData);
+      const result = await dispatch(
+        updateSupplierAction({ id, data: supplierData })
+      );
 
-      if (result.success) {
-        dispatch(updateSupplierAction(result.supplier));
+      if (result.payload) {
         toast.success("Supplier updated successfully!");
+        setIsEditModalOpen(false);
       } else {
-        toast.error(result.error);
+        toast.error(result.payload || "Failed to update supplier");
       }
     } catch (error) {
       console.error("Error updating supplier:", error);
@@ -120,21 +103,20 @@ function Suppliers() {
     try {
       setDeleteLoading(true);
 
-      const result = await deleteSupplierFromFirebase(selectedSupplier.id);
+      const result = await dispatch(deleteSupplierAction(selectedSupplier.id));
 
-      if (result.success) {
-        dispatch(deleteSupplierAction(selectedSupplier.id));
+      if (result.payload) {
         toast.success("Supplier deleted successfully!");
+        setIsDeleteDialogOpen(false);
+        setSelectedSupplier(null);
       } else {
-        toast.error(result.error);
+        toast.error(result.payload || "Failed to delete supplier");
       }
     } catch (error) {
       console.error("Error deleting supplier:", error);
       toast.error("Failed to delete supplier");
     } finally {
       setDeleteLoading(false);
-      setIsDeleteDialogOpen(false);
-      setSelectedSupplier(null);
     }
   };
 
