@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-// src/pages/admin/Products.jsx - CONNECTED TO FIREBASE
+// src/pages/admin/Products.jsx
+// ✅ REFACTORED: Using thunks instead of manual dispatch
 
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -11,6 +11,7 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import { toast } from "react-toastify";
 
@@ -21,123 +22,41 @@ import AddProductModal from "../../components/admin/ProductManagement/AddProduct
 import EditProductModal from "../../components/admin/ProductManagement/EditProductModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
-// Redux actions
-import {
-  setProducts,
-  addProduct as addProductAction,
-  updateProduct as updateProductAction,
-  deleteProduct as deleteProductAction,
-  setLoading,
-  setError,
-} from "../../redux/slices/productSlice";
-
-// Firebase service
+// ✅ Import thunks (not manual actions!)
 import {
   fetchProducts,
-  addProduct as addProductToFirebase,
-  updateProduct as updateProductInFirebase,
-  deleteProduct as deleteProductFromFirebase,
-  enrichProductWithNames,
-} from "../../services/productService";
+  addProduct,
+  updateProduct,
+  deleteProduct,
+} from "../../redux/slices/productSlice";
 
-// Import category and supplier services
-import { fetchCategories } from "../../services/categoryService";
-
-import { fetchSuppliers } from "../../services/supplierService";
-
-import { setCategories } from "../../redux/slices/categorySlice";
-
-import { setSuppliers } from "../../redux/slices/supplierSlice";
+import { fetchCategories } from "../../redux/slices/categorySlice";
+import { fetchSuppliers } from "../../redux/slices/supplierSlice";
 
 function Products() {
   const dispatch = useDispatch();
 
-  // ===============================================
-  // REDUX STATE - Get from store (not mock data!)
-  // ===============================================
-  const { products, loading } = useSelector((state) => state.products);
+  // ✅ Read from Redux store
+  const { products, loading, error } = useSelector((state) => state.products);
   const { categories } = useSelector((state) => state.categories);
   const { suppliers } = useSelector((state) => state.suppliers);
 
-  // ===============================================
-  // LOCAL STATE (UI only)
-  // ===============================================
+  // Local UI state only
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-
-  // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Selected product for edit/delete
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // ===============================================
-  // FETCH ALL DATA ON MOUNT
-  // ===============================================
+  // ✅ CORRECT: Just dispatch thunks, no try-catch!
   useEffect(() => {
-    loadProducts();
-    loadCategories();
-    loadSuppliers();
-  }, []);
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+    dispatch(fetchSuppliers());
+  }, [dispatch]);
 
-  const loadCategories = async () => {
-    try {
-      const result = await fetchCategories();
-      if (result.success) {
-        dispatch(setCategories(result.categories));
-      }
-    } catch (error) {
-      console.error("Error loading categories:", error);
-    }
-  };
-
-  const loadSuppliers = async () => {
-    try {
-      const result = await fetchSuppliers();
-      if (result.success) {
-        dispatch(setSuppliers(result.suppliers));
-      }
-    } catch (error) {
-      console.error("Error loading suppliers:", error);
-    }
-  };
-
-  const loadProducts = async () => {
-    try {
-      dispatch(setLoading(true));
-
-      const result = await fetchProducts();
-
-      if (result.success) {
-        // Enrich products with category and supplier names
-        const enrichedProducts = await Promise.all(
-          result.products.map((product) =>
-            enrichProductWithNames(product, categories, suppliers)
-          )
-        );
-
-        dispatch(setProducts(enrichedProducts));
-      } else {
-        dispatch(setError(result.error));
-        toast.error(result.error);
-      }
-    } catch (error) {
-      console.error("Error loading products:", error);
-      toast.error("Failed to load products");
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
-
-  // ===============================================
-  // FILTER PRODUCTS (Client-side)
-  // ===============================================
-  // Filter happens in browser after fetching from Firebase
-  // For large datasets, consider server-side filtering
-  // ===============================================
+  // ✅ CORRECT: Filter in component (client-side)
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name
       .toLowerCase()
@@ -148,95 +67,49 @@ function Products() {
   });
 
   // ===============================================
-  // CRUD HANDLERS (Connected to Firebase)
+  // CRUD HANDLERS - CLEAN & SIMPLE!
   // ===============================================
 
-  // ADD PRODUCT
+  // ✅ CORRECT: Just dispatch, use .unwrap() for toast
   const handleAddProduct = async (productData) => {
     try {
-      // Add to Firebase
-      const result = await addProductToFirebase(productData);
-
-      if (result.success) {
-        // Enrich with names
-        const enrichedProduct = await enrichProductWithNames(
-          result.product,
-          categories,
-          suppliers
-        );
-
-        // Update Redux
-        dispatch(addProductAction(enrichedProduct));
-        toast.success("Product added successfully!");
-      } else {
-        toast.error(result.error);
-      }
+      await dispatch(addProduct(productData)).unwrap();
+      setIsAddModalOpen(false);
+      toast.success("Product added successfully!");
     } catch (error) {
-      console.error("Error adding product:", error);
-      toast.error("Failed to add product");
+      toast.error(error);
     }
   };
 
-  // EDIT PRODUCT
   const handleEditProduct = async (updatedProduct) => {
     try {
-      const { id, ...productData } = updatedProduct;
-
-      // Update in Firebase
-      const result = await updateProductInFirebase(id, productData);
-
-      if (result.success) {
-        // Enrich with names
-        const enrichedProduct = await enrichProductWithNames(
-          result.product,
-          categories,
-          suppliers
-        );
-
-        // Update Redux
-        dispatch(updateProductAction(enrichedProduct));
-        toast.success("Product updated successfully!");
-      } else {
-        toast.error(result.error);
-      }
+      const { id, ...data } = updatedProduct;
+      await dispatch(updateProduct({ id, data })).unwrap();
+      setIsEditModalOpen(false);
+      setSelectedProduct(null);
+      toast.success("Product updated successfully!");
     } catch (error) {
-      console.error("Error updating product:", error);
-      toast.error("Failed to update product");
+      toast.error(error);
     }
   };
 
-  // DELETE PRODUCT
   const handleDeleteProduct = async () => {
     try {
-      setDeleteLoading(true);
-
-      // Delete from Firebase
-      const result = await deleteProductFromFirebase(selectedProduct.id);
-
-      if (result.success) {
-        // Update Redux
-        dispatch(deleteProductAction(selectedProduct.id));
-        toast.success("Product deleted successfully!");
-      } else {
-        toast.error(result.error);
-      }
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      toast.error("Failed to delete product");
-    } finally {
-      setDeleteLoading(false);
+      await dispatch(deleteProduct(selectedProduct.id)).unwrap();
       setIsDeleteDialogOpen(false);
       setSelectedProduct(null);
+      toast.success("Product deleted successfully!");
+    } catch (error) {
+      toast.error(error);
     }
   };
 
-  // Open Edit Modal
+  // Modal handlers
   const handleOpenEditModal = (product) => {
     setSelectedProduct(product);
     setIsEditModalOpen(true);
   };
 
-  // Open Delete Dialog
   const handleOpenDeleteDialog = (product) => {
     setSelectedProduct(product);
     setIsDeleteDialogOpen(true);
@@ -247,7 +120,6 @@ function Products() {
   // ===============================================
   return (
     <Box>
-      {/* Page Header */}
       <PageHeader
         title="Products"
         subtitle="Manage your product inventory"
@@ -255,10 +127,16 @@ function Products() {
         onButtonClick={() => setIsAddModalOpen(true)}
       />
 
-      {/* Filters Section */}
+      {/* Error Display */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          {/* Search Bar */}
           <SearchBar
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -266,7 +144,6 @@ function Products() {
             fullWidth
           />
 
-          {/* Category Filter */}
           <FormControl sx={{ minWidth: 200 }}>
             <InputLabel size="small">Filter by Category</InputLabel>
             <Select
@@ -292,7 +169,6 @@ function Products() {
           <CircularProgress />
         </Box>
       ) : (
-        /* Products Table */
         <ProductTable
           products={filteredProducts}
           onEdit={handleOpenEditModal}
@@ -300,7 +176,7 @@ function Products() {
         />
       )}
 
-      {/* Add Product Modal */}
+      {/* Modals */}
       <AddProductModal
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -308,8 +184,6 @@ function Products() {
         categories={categories}
         suppliers={suppliers}
       />
-
-      {/* Edit Product Modal */}
       <EditProductModal
         open={isEditModalOpen}
         onClose={() => {
@@ -322,7 +196,6 @@ function Products() {
         suppliers={suppliers}
       />
 
-      {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         open={isDeleteDialogOpen}
         onClose={() => {
@@ -333,34 +206,9 @@ function Products() {
         title="Delete Product"
         message="Are you sure you want to delete"
         itemName={selectedProduct?.name}
-        loading={deleteLoading}
       />
     </Box>
   );
 }
 
 export default Products;
-
-// ===============================================
-// KEY CHANGES FROM MOCK VERSION:
-// ===============================================
-// 1. ✅ Uses Redux instead of useState for products
-// 2. ✅ Fetches from Firebase on mount (useEffect)
-// 3. ✅ Add/Edit/Delete call Firebase first, then update Redux
-// 4. ✅ Shows loading spinner while fetching
-// 5. ✅ Toast notifications for all operations
-// 6. ✅ Error handling for all Firebase operations
-// 7. ✅ Enriches products with category/supplier names
-// ===============================================
-
-// ===============================================
-// TESTING CHECKLIST:
-// ===============================================
-// ✅ Page loads and fetches products from Firebase
-// ✅ Add product → saves to Firebase → appears in table
-// ✅ Edit product → updates in Firebase → changes reflect
-// ✅ Delete product → removes from Firebase → disappears
-// ✅ Refresh page → products persist (data in Firebase)
-// ✅ Search works with Firebase data
-// ✅ Category filter works with Firebase data
-// ===============================================

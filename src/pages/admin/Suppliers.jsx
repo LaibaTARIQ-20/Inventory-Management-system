@@ -1,15 +1,16 @@
 // src/pages/admin/Suppliers.jsx
-// FIXED IMPORTS - No more errors!
+// UPDATED: Added "View Map" button to navigate to SuppliersMap page
 
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { Box, Paper, CircularProgress } from "@mui/material";
+import { useNavigate } from "react-router-dom"; // ✅ NEW
+import { Box, Paper, CircularProgress, Button } from "@mui/material";
 import { toast } from "react-toastify";
+import MapIcon from "@mui/icons-material/Map"; // ✅ NEW
 
 import PageHeader from "../../components/common/PageHeader";
 import SearchBar from "../../components/common/SearchBar";
 
-// ✅ FIXED: Use actual file names (without _WITH_VIEW suffix)
 import SuppliersTable from "../../components/admin/SupplierManagement/SuppliersTable";
 import AddSupplierModal from "../../components/admin/SupplierManagement/AddSupplierModal";
 import EditSupplierModal from "../../components/admin/SupplierManagement/EditSupplierModal";
@@ -36,6 +37,7 @@ import {
 
 function Suppliers() {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // ✅ NEW
 
   // Redux state
   const { suppliers, loading } = useSelector((state) => state.suppliers);
@@ -164,14 +166,34 @@ function Suppliers() {
         onButtonClick={() => setIsAddModalOpen(true)}
       />
 
-      {/* Search Section */}
+      {/* Search Section + View Map Button */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <SearchBar
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search suppliers by name..."
-          fullWidth
-        />
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <SearchBar
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search suppliers by name..."
+            sx={{ flex: 1, minWidth: 300 }}
+          />
+
+          {/* ✅ NEW: View Map Button */}
+          <Button
+            variant="outlined"
+            startIcon={<MapIcon />}
+            onClick={() => navigate("/admin/suppliers/map")}
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            View Map
+          </Button>
+        </Box>
       </Paper>
 
       {/* Loading State */}

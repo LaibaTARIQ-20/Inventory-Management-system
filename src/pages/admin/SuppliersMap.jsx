@@ -1,73 +1,76 @@
-/* eslint-disable react-hooks/immutability */
-// src/pages/admin/SuppliersMapView.jsx
-// NEW PAGE - All Suppliers on One Map
+/* eslint-disable react-hooks/exhaustive-deps */
+// src/pages/admin/SuppliersMap.jsx
+// Display all supplier locations on a single map with clickable pins
 
-import { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
+  Paper,
+  Typography,
   Card,
   CardContent,
-  Typography,
+  Button,
+  Chip,
   CircularProgress,
   Alert,
-  Button,
 } from "@mui/material";
+import MapIcon from "@mui/icons-material/Map";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import EmailIcon from "@mui/icons-material/Email";
+import PhoneIcon from "@mui/icons-material/Phone";
+import { Marker, InfoWindow } from "@react-google-maps/api";
 
-import MultipleMarkers from "../../components/maps/MultipleMarkers";
+import MapContainer from "../../components/maps/MapContainer";
 import PageHeader from "../../components/common/PageHeader";
-import { fetchSuppliers } from "../../services/supplierService";
-import { setSuppliers } from "../../redux/slices/supplierSlice";
 
 /**
- * Suppliers Map View Page
- * Display all suppliers on a single map
+ * Suppliers Map Page
+ * Displays all supplier locations on a single interactive map
  */
-const SuppliersMapView = () => {
-  const dispatch = useDispatch();
+const SuppliersMap = () => {
   const navigate = useNavigate();
-  const suppliers = useSelector((state) => state.suppliers.suppliers);
-  const [loading, setLoading] = useState(true);
+  const { suppliers, loading } = useSelector((state) => state.suppliers);
 
-  useEffect(() => {
-    loadSuppliers();
-  }, []);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 33.0354, lng: 73.7239 }); // Default: Jhelum, Pakistan
 
-  const loadSuppliers = async () => {
-    setLoading(true);
-    const result = await fetchSuppliers();
-    if (result.success) {
-      dispatch(setSuppliers(result.suppliers));
-    }
-    setLoading(false);
-  };
-
-  // Filter suppliers with valid locations
+  // Filter suppliers that have location data
   const suppliersWithLocation = suppliers.filter(
     (supplier) => supplier.lat && supplier.lng
   );
 
-  // Prepare data for map
-  const mapLocations = suppliersWithLocation.map((supplier) => ({
-    id: supplier.id,
-    lat: supplier.lat,
-    lng: supplier.lng,
-    name: supplier.name,
-    address: supplier.address,
-    phone: supplier.phone,
-    email: supplier.email,
-  }));
+  // Calculate map center based on all supplier locations
+  useEffect(() => {
+    if (suppliersWithLocation.length > 0) {
+      const avgLat =
+        suppliersWithLocation.reduce((sum, s) => sum + s.lat, 0) /
+        suppliersWithLocation.length;
+      const avgLng =
+        suppliersWithLocation.reduce((sum, s) => sum + s.lng, 0) /
+        suppliersWithLocation.length;
+
+      setMapCenter({ lat: avgLat, lng: avgLng });
+    }
+  }, [suppliersWithLocation.length]);
+
+  const handleMarkerClick = (supplier) => {
+    setSelectedSupplier(supplier);
+  };
+
+  const handleInfoWindowClose = () => {
+    setSelectedSupplier(null);
+  };
+
+  const handleViewSupplierDetails = (supplierId) => {
+    navigate(`/admin/suppliers?view=${supplierId}`);
+  };
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
         <CircularProgress />
       </Box>
     );
@@ -75,45 +78,186 @@ const SuppliersMapView = () => {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/admin/suppliers")}
-          variant="outlined"
-        >
-          Back to Suppliers
-        </Button>
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Suppliers Map View
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {suppliersWithLocation.length} suppliers with locations
-          </Typography>
-        </Box>
-      </Box>
+      {/* Page Header */}
+      <PageHeader
+        title="Suppliers Map"
+        subtitle="View all supplier locations on the map"
+        buttonText="Back to Suppliers"
+        buttonIcon={<ArrowBackIcon />}
+        onButtonClick={() => navigate("/admin/suppliers")}
+      />
 
-      <Card>
+      {/* Statistics Card */}
+      <Card sx={{ mb: 3 }}>
         <CardContent>
-          {suppliersWithLocation.length === 0 ? (
-            <Alert severity="info">
-              No suppliers with locations found. Add locations to suppliers to
-              see them on the map.
-            </Alert>
-          ) : (
-            <>
-              <Box sx={{ mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <MapIcon color="primary" fontSize="large" />
+              <Box>
+                <Typography variant="h6">
+                  {suppliersWithLocation.length} Suppliers on Map
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Click on any marker to see supplier details
+                  Out of {suppliers.length} total suppliers
                 </Typography>
               </Box>
-              <MultipleMarkers locations={mapLocations} height="600px" />
-            </>
-          )}
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Chip
+                icon={<LocationOnIcon />}
+                label={`${suppliersWithLocation.length} Locations`}
+                color="success"
+                variant="outlined"
+              />
+              <Chip
+                label={`${
+                  suppliers.length - suppliersWithLocation.length
+                } Without Location`}
+                color="default"
+                variant="outlined"
+              />
+            </Box>
+          </Box>
         </CardContent>
       </Card>
+
+      {/* Map Display */}
+      {suppliersWithLocation.length > 0 ? (
+        <Paper sx={{ p: 2, height: "calc(100vh - 300px)", minHeight: 500 }}>
+          <MapContainer
+            center={mapCenter}
+            zoom={10}
+            containerStyle={{ height: "100%", borderRadius: "8px" }}
+          >
+            {/* Render markers for each supplier */}
+            {suppliersWithLocation.map((supplier) => (
+              <Marker
+                key={supplier.id}
+                position={{ lat: supplier.lat, lng: supplier.lng }}
+                title={supplier.name}
+                onClick={() => handleMarkerClick(supplier)}
+                animation={
+                  selectedSupplier?.id === supplier.id
+                    ? window.google.maps.Animation.BOUNCE
+                    : null
+                }
+              />
+            ))}
+
+            {/* Info Window for selected supplier */}
+            {selectedSupplier && (
+              <InfoWindow
+                position={{
+                  lat: selectedSupplier.lat,
+                  lng: selectedSupplier.lng,
+                }}
+                onCloseClick={handleInfoWindowClose}
+              >
+                <Box sx={{ p: 1, minWidth: 250 }}>
+                  {/* Supplier Name */}
+                  <Typography variant="h6" gutterBottom>
+                    {selectedSupplier.name}
+                  </Typography>
+
+                  {/* Email */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mb: 1,
+                    }}
+                  >
+                    <EmailIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">
+                      {selectedSupplier.email}
+                    </Typography>
+                  </Box>
+
+                  {/* Phone */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mb: 1,
+                    }}
+                  >
+                    <PhoneIcon fontSize="small" color="success" />
+                    <Typography variant="body2">
+                      {selectedSupplier.phone}
+                    </Typography>
+                  </Box>
+
+                  {/* Address */}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    {selectedSupplier.address}
+                  </Typography>
+
+                  {/* Actions */}
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() =>
+                        handleViewSupplierDetails(selectedSupplier.id)
+                      }
+                    >
+                      View Details
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() =>
+                        window.open(
+                          `https://www.google.com/maps?q=${selectedSupplier.lat},${selectedSupplier.lng}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      Open in Maps
+                    </Button>
+                  </Box>
+                </Box>
+              </InfoWindow>
+            )}
+          </MapContainer>
+        </Paper>
+      ) : (
+        <Alert severity="info" sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            No Suppliers with Location Data
+          </Typography>
+          <Typography variant="body2">
+            Add location information to your suppliers to see them on the map.
+            Go to the Suppliers page and edit each supplier to add their
+            location.
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            sx={{ mt: 2 }}
+            onClick={() => navigate("/admin/suppliers")}
+          >
+            Go to Suppliers
+          </Button>
+        </Alert>
+      )}
     </Box>
   );
 };
 
-export default SuppliersMapView;
+export default SuppliersMap;

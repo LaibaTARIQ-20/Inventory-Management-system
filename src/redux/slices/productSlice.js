@@ -1,17 +1,103 @@
 // src/redux/slices/productSlice.js
+// ✅ REFACTORED: Using createAsyncThunk (CORRECT WAY)
 
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import {
+  fetchProducts as fetchProductsService,
+  addProduct as addProductService,
+  updateProduct as updateProductService,
+  deleteProduct as deleteProductService,
+} from "../../services/productService";
 
 // ===============================================
-// CONCEPT: Products State Structure
+// ASYNC THUNKS - Handle all Firebase operations
 // ===============================================
-// products: Array of product objects from Firebase
-// loading: For showing skeleton/spinner
-// error: Display error messages
-// selectedProduct: For edit modal (which product is being edited)
-// filters: For search and category filtering
+// WHY createAsyncThunk?
+// ✅ Automatically manages loading/error states
+// ✅ No manual try-catch in components
+// ✅ Business logic stays in Redux, not UI
+// ✅ Consistent pattern across app
 // ===============================================
 
+/**
+ * Fetch all products from Firebase
+ * Dispatched from: Products.jsx on mount
+ */
+export const fetchProducts = createAsyncThunk(
+  "products/fetchAll",
+  async (_, { rejectWithValue }) => {
+    try {
+      const result = await fetchProductsService();
+      if (result.success) {
+        return result.products;
+      }
+      return rejectWithValue(result.error || "Failed to fetch products");
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+/**
+ * Add new product to Firebase
+ * Dispatched from: AddProductModal on submit
+ */
+export const addProduct = createAsyncThunk(
+  "products/add",
+  async (productData, { rejectWithValue }) => {
+    try {
+      const result = await addProductService(productData);
+      if (result.success) {
+        return result.product;
+      }
+      return rejectWithValue(result.error || "Failed to add product");
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+/**
+ * Update existing product in Firebase
+ * Dispatched from: EditProductModal on submit
+ */
+export const updateProduct = createAsyncThunk(
+  "products/update",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const result = await updateProductService(id, data);
+      if (result.success) {
+        return result.product;
+      }
+      return rejectWithValue(result.error || "Failed to update product");
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+/**
+ * Delete product from Firebase
+ * Dispatched from: DeleteConfirmDialog on confirm
+ */
+export const deleteProduct = createAsyncThunk(
+  "products/delete",
+  async (productId, { rejectWithValue }) => {
+    try {
+      const result = await deleteProductService(productId);
+      if (result.success) {
+        return productId; // Return ID to remove from state
+      }
+      return rejectWithValue(result.error || "Failed to delete product");
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// ===============================================
+// SLICE DEFINITION
+// ===============================================
 const initialState = {
   products: [],
   loading: false,
@@ -28,275 +114,174 @@ const productSlice = createSlice({
   initialState,
   reducers: {
     // ===============================================
-    // CRUD Operations: Create, Read, Update, Delete
+    // SYNC ACTIONS (No API calls)
     // ===============================================
 
-    // READ: Fetch all products from Firebase
-    setProducts: (state, action) => {
-      // ===============================================
-      // WHEN: After fetching from Firestore
-      // PAYLOAD: Array of products
-      //
-      // EXAMPLE:
-      // const snapshot = await getDocs(collection(db, 'products'));
-      // const products = snapshot.docs.map(doc => ({
-      //   id: doc.id,
-      //   ...doc.data()
-      // }));
-      // dispatch(setProducts(products));
-      // ===============================================
-      state.products = action.payload;
-      state.loading = false;
-      state.error = null;
-    },
-
-    // CREATE: Add new product
-    addProduct: (state, action) => {
-      // ===============================================
-      // WHEN: After successfully adding to Firestore
-      // PAYLOAD: Single product object with id
-      //
-      // WHY update Redux?
-      // - Instant UI update (no refetch needed)
-      // - Better UX (feels faster)
-      // - Reduces Firebase reads (saves money!)
-      //
-      // ALTERNATIVE: Could refetch all products
-      // But that's slower and wastes quota
-      // ===============================================
-      state.products.push(action.payload);
-    },
-
-    // UPDATE: Edit existing product
-    updateProduct: (state, action) => {
-      // ===============================================
-      // CONCEPT: Array.findIndex()
-      // ===============================================
-      // Find product position in array
-      // Returns -1 if not found
-      //
-      // WHY not filter()?
-      // - filter creates new array (inefficient)
-      // - findIndex just gives us the position
-      // - We replace that one item
-      //
-      // IMMUTABILITY:
-      // Immer handles this - looks like mutation but isn't
-      // ===============================================
-      const index = state.products.findIndex((p) => p.id === action.payload.id);
-      if (index !== -1) {
-        state.products[index] = action.payload;
-      }
-    },
-
-    // DELETE: Remove product
-    deleteProduct: (state, action) => {
-      // ===============================================
-      // CONCEPT: Array.filter()
-      // ===============================================
-      // Creates new array without deleted item
-      // action.payload = product ID to delete
-      //
-      // WHY filter?
-      // - Clean way to remove item
-      // - Returns new array (immutable)
-      // - Immer optimizes this
-      //
-      // ALTERNATIVE: splice() - but harder to read
-      // ===============================================
-      state.products = state.products.filter((p) => p.id !== action.payload);
-    },
-
-    // ===============================================
-    // Loading States
-    // ===============================================
-    // WHY separate loading actions?
-    // - Control when spinner shows
-    // - Different operations (fetch vs save)
-    // - Better UX feedback
-    // ===============================================
-    setLoading: (state, action) => {
-      state.loading = action.payload;
-    },
-
-    setError: (state, action) => {
-      state.error = action.payload;
-      state.loading = false;
-    },
-
+    // Clear error message
     clearError: (state) => {
       state.error = null;
     },
 
-    // ===============================================
-    // Selected Product (for Edit Modal)
-    // ===============================================
-    // PATTERN: Modal management in Redux
-    //
-    // FLOW:
-    // 1. User clicks "Edit" button
-    // 2. dispatch(setSelectedProduct(product))
-    // 3. Modal opens, shows product data
-    // 4. User edits and saves
-    // 5. dispatch(setSelectedProduct(null)) - close modal
-    //
-    // WHY in Redux?
-    // - Modal can be in different component tree
-    // - Easy to access from anywhere
-    // - Consistent with rest of state
-    //
-    // ALTERNATIVE: Local state (useState)
-    // But Redux is cleaner for complex apps
-    // ===============================================
+    // Set selected product for editing
     setSelectedProduct: (state, action) => {
       state.selectedProduct = action.payload;
     },
 
-    // ===============================================
-    // Filtering (Search & Category)
-    // ===============================================
-    // CONCEPT: Client-side filtering vs Server-side
-    //
-    // CLIENT-SIDE (What we do):
-    // - Fetch all products once
-    // - Filter in browser using Redux state
-    // - Fast, no extra Firebase calls
-    // - Good for small datasets (< 1000 items)
-    //
-    // SERVER-SIDE:
-    // - Query Firebase with filters
-    // - Only get matching products
-    // - Better for large datasets
-    // - Costs more (more Firebase reads)
-    //
-    // For inventory system with 100-500 products:
-    // Client-side is perfect!
-    // ===============================================
-
+    // Update search query
     setSearchQuery: (state, action) => {
       state.filters.searchQuery = action.payload;
     },
 
+    // Update category filter
     setCategoryFilter: (state, action) => {
       state.filters.categoryId = action.payload;
     },
 
+    // Clear all filters
     clearFilters: (state) => {
       state.filters.searchQuery = "";
       state.filters.categoryId = "";
     },
 
-    // ===============================================
-    // Bulk Operations (Advanced)
-    // ===============================================
-    // USE CASES:
-    // - Import products from CSV
-    // - Update multiple products at once
-    // - Delete multiple selected items
-    // ===============================================
-    bulkAddProducts: (state, action) => {
-      state.products.push(...action.payload);
-    },
-
-    bulkDeleteProducts: (state, action) => {
-      // action.payload = array of IDs to delete
-      const idsToDelete = new Set(action.payload);
-      state.products = state.products.filter((p) => !idsToDelete.has(p.id));
-    },
-
-    // ===============================================
-    // Update Stock (Important for orders!)
-    // ===============================================
-    // WHEN: Customer places order
-    // FLOW:
-    // 1. Order placed for 3 units
-    // 2. dispatch(updateProductStock({ id: 'prod1', quantity: -3 }))
-    // 3. Stock decreases from 10 to 7
-    // 4. UI updates immediately
-    //
-    // WHY separate action?
-    // - Common operation
-    // - Might have business logic (prevent negative stock)
-    // - Could trigger low stock alerts
-    // ===============================================
+    // Update product stock (for order placement)
     updateProductStock: (state, action) => {
       const { id, quantity } = action.payload;
       const product = state.products.find((p) => p.id === id);
       if (product) {
-        // Ensure stock doesn't go negative
         product.stock = Math.max(0, product.stock + quantity);
       }
     },
   },
+
+  // ===============================================
+  // EXTRA REDUCERS - Handle async thunk states
+  // ===============================================
+  // CONCEPT: 3 states for each async operation
+  // 1. pending   - loading = true
+  // 2. fulfilled - loading = false, update state
+  // 3. rejected  - loading = false, set error
+  // ===============================================
+  extraReducers: (builder) => {
+    // -----------------------------------------------
+    // FETCH PRODUCTS
+    // -----------------------------------------------
+    builder
+      .addCase(fetchProducts.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchProducts.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products = action.payload;
+      })
+      .addCase(fetchProducts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // -----------------------------------------------
+    // ADD PRODUCT
+    // -----------------------------------------------
+    builder
+      .addCase(addProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addProduct.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products.push(action.payload);
+      })
+      .addCase(addProduct.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // -----------------------------------------------
+    // UPDATE PRODUCT
+    // -----------------------------------------------
+    builder
+      .addCase(updateProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProduct.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.products.findIndex(
+          (p) => p.id === action.payload.id
+        );
+        if (index !== -1) {
+          state.products[index] = action.payload;
+        }
+      })
+      .addCase(updateProduct.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // -----------------------------------------------
+    // DELETE PRODUCT
+    // -----------------------------------------------
+    builder
+      .addCase(deleteProduct.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteProduct.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products = state.products.filter((p) => p.id !== action.payload);
+      })
+      .addCase(deleteProduct.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+  },
 });
 
+// ===============================================
+// EXPORT ACTIONS & REDUCER
+// ===============================================
 export const {
-  setProducts,
-  addProduct,
-  updateProduct,
-  deleteProduct,
-  setLoading,
-  setError,
   clearError,
   setSelectedProduct,
   setSearchQuery,
   setCategoryFilter,
   clearFilters,
-  bulkAddProducts,
-  bulkDeleteProducts,
   updateProductStock,
 } = productSlice.actions;
 
 export default productSlice.reducer;
 
 // ===============================================
-// ADVANCED: Memoized Selectors
+// SELECTORS
 // ===============================================
-// CONCEPT: Computed values from state
-//
-// WHY memoized?
-// - Expensive calculations cached
-// - Only recalculate when dependencies change
-// - Better performance in large lists
-//
-// TOOL: Reselect library (optional, advanced)
-// For now, simple selectors are enough
-// ===============================================
-
-// Get all products
 export const selectAllProducts = (state) => state.products.products;
+export const selectProductsLoading = (state) => state.products.loading;
+export const selectProductsError = (state) => state.products.error;
+export const selectSelectedProduct = (state) => state.products.selectedProduct;
+export const selectProductsCount = (state) => state.products.products.length;
 
-// Get filtered products (search + category)
+// Filtered products (search + category)
 export const selectFilteredProducts = (state) => {
   const { products, filters } = state.products;
   const { searchQuery, categoryId } = filters;
 
   return products.filter((product) => {
-    // Filter by search query
     const matchesSearch = product.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-
-    // Filter by category
     const matchesCategory = !categoryId || product.categoryId === categoryId;
-
     return matchesSearch && matchesCategory;
   });
 };
 
-// Get products count
-export const selectProductsCount = (state) => state.products.products.length;
-
-// Get low stock products (stock < 5)
+// Low stock products (< 5)
 export const selectLowStockProducts = (state) =>
-  state.products.products.filter((p) => p.stock < 5);
+  state.products.products.filter((p) => p.stock > 0 && p.stock < 5);
 
-// Get out of stock products
+// Out of stock products
 export const selectOutOfStockProducts = (state) =>
   state.products.products.filter((p) => p.stock === 0);
 
-// Get loading state
-export const selectProductsLoading = (state) => state.products.loading;
-
-// Get selected product for editing
-export const selectSelectedProduct = (state) => state.products.selectedProduct;
+// Total stock count
+export const selectTotalStock = (state) =>
+  state.products.products.reduce((sum, p) => sum + (p.stock || 0), 0);

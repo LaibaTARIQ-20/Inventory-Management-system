@@ -1,4 +1,5 @@
-// src/pages/admin/Categories.jsx - CONNECTED TO FIREBASE
+// src/pages/admin/Categories.jsx
+// UPDATED: Using async thunks properly
 
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -12,29 +13,22 @@ import AddCategoryModal from "../../components/admin/CategoryManagement/AddCateg
 import EditCategoryModal from "../../components/admin/CategoryManagement/EditCategoryModal";
 import DeleteConfirmDialog from "../../components/common/DeleteConfirmDialog";
 
-// Redux actions
-import {
-  setCategories,
-  addCategory as addCategoryAction,
-  updateCategory as updateCategoryAction,
-  deleteCategory as deleteCategoryAction,
-  setCategoryLoading,
-  setCategoryError,
-} from "../../redux/slices/categorySlice";
-
-// Firebase service
+// Redux async thunks
 import {
   fetchCategories,
-  addCategory as addCategoryToFirebase,
-  updateCategory as updateCategoryInFirebase,
-  deleteCategory as deleteCategoryFromFirebase,
-} from "../../services/categoryService";
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  clearError,
+} from "../../redux/slices/categorySlice";
 
 function Categories() {
   const dispatch = useDispatch();
 
   // Redux state
-  const { categories, loading } = useSelector((state) => state.categories);
+  const { categories, loading, error } = useSelector(
+    (state) => state.categories
+  );
 
   // Local state
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,88 +44,56 @@ function Categories() {
 
   // Fetch categories on mount
   useEffect(() => {
-    loadCategories();
-  }, []);
+    dispatch(fetchCategories());
+  }, [dispatch]);
 
-  const loadCategories = async () => {
-    try {
-      dispatch(setCategoryLoading(true));
-
-      const result = await fetchCategories();
-
-      if (result.success) {
-        dispatch(setCategories(result.categories));
-      } else {
-        dispatch(setCategoryError(result.error));
-        toast.error(result.error);
-      }
-    } catch (error) {
-      console.error("Error loading categories:", error);
-      toast.error("Failed to load categories");
-    } finally {
-      dispatch(setCategoryLoading(false));
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      dispatch(clearError());
     }
-  };
+  }, [error, dispatch]);
 
   // Filter categories
   const filteredCategories = categories.filter((category) =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // CRUD Handlers
+  // CRUD Handlers using async thunks
   const handleAddCategory = async (categoryData) => {
     try {
-      const result = await addCategoryToFirebase(categoryData);
-
-      if (result.success) {
-        dispatch(addCategoryAction(result.category));
-        toast.success("Category added successfully!");
-      } else {
-        toast.error(result.error);
-      }
+      await dispatch(addCategory(categoryData)).unwrap();
+      toast.success("Category added successfully!");
+      setIsAddModalOpen(false);
     } catch (error) {
-      console.error("Error adding category:", error);
-      toast.error("Failed to add category");
+      toast.error(error || "Failed to add category");
     }
   };
 
   const handleEditCategory = async (updatedCategory) => {
     try {
       const { id, ...categoryData } = updatedCategory;
-
-      const result = await updateCategoryInFirebase(id, categoryData);
-
-      if (result.success) {
-        dispatch(updateCategoryAction(result.category));
-        toast.success("Category updated successfully!");
-      } else {
-        toast.error(result.error);
-      }
+      await dispatch(updateCategory({ id, data: categoryData })).unwrap();
+      toast.success("Category updated successfully!");
+      setIsEditModalOpen(false);
+      setSelectedCategory(null);
     } catch (error) {
-      console.error("Error updating category:", error);
-      toast.error("Failed to update category");
+      toast.error(error || "Failed to update category");
     }
   };
 
   const handleDeleteCategory = async () => {
     try {
       setDeleteLoading(true);
-
-      const result = await deleteCategoryFromFirebase(selectedCategory.id);
-
-      if (result.success) {
-        dispatch(deleteCategoryAction(selectedCategory.id));
-        toast.success("Category deleted successfully!");
-      } else {
-        toast.error(result.error);
-      }
-    } catch (error) {
-      console.error("Error deleting category:", error);
-      toast.error("Failed to delete category");
-    } finally {
-      setDeleteLoading(false);
+      await dispatch(deleteCategory(selectedCategory.id)).unwrap();
+      toast.success("Category deleted successfully!");
       setIsDeleteDialogOpen(false);
       setSelectedCategory(null);
+    } catch (error) {
+      toast.error(error || "Failed to delete category");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 

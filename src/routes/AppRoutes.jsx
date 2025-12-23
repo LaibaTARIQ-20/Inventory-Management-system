@@ -11,7 +11,7 @@ import AdminProducts from "../pages/admin/Products";
 import AdminCategories from "../pages/admin/Categories";
 import AdminSuppliers from "../pages/admin/Suppliers";
 import AdminOrders from "../pages/admin/Orders";
-
+import SuppliersMap from "../pages/admin/SuppliersMap"
 // Customer Pages
 import CustomerDashboard from "../pages/customer/CustomerDashboard";
 import CustomerProducts from "../pages/customer/Products";
@@ -31,18 +31,20 @@ function AppRoutes() {
           PUBLIC ROUTES - No authentication needed
           ============================================ */}
 
-      {/* Root redirect based on auth status */}
+      {/* ============================================
+          PUBLIC ROUTES - No authentication needed
+          ============================================ */}
       <Route
         path="/"
         element={
           isAuthenticated ? (
-            user?.role === "admin" ? (
-              <Navigate to="/admin/dashboard" replace />
-            ) : (
-              <Navigate to="/customer/products" replace />
-            )
+        user?.role === "admin" ? (
+          <Navigate to="/admin/dashboard" replace />
+        ) : (
+          <Navigate to="/customer/products" replace />
+        )
           ) : (
-            <Navigate to="/login" replace />
+        <Navigate to="/login" replace />
           )
         }
       />
@@ -51,16 +53,16 @@ function AppRoutes() {
         path="/login"
         element={
           isAuthenticated ? (
-            <Navigate
-              to={
-                user?.role === "admin"
-                  ? "/admin/dashboard"
-                  : "/customer/products"
-              }
-              replace
-            />
+        <Navigate
+          to={
+            user?.role === "admin"
+          ? "/admin/dashboard"
+          : "/customer/products"
+          }
+          replace
+        />
           ) : (
-            <Login />
+        <Login />
           )
         }
       />
@@ -69,25 +71,29 @@ function AppRoutes() {
         path="/register"
         element={
           isAuthenticated ? (
-            <Navigate
-              to={
-                user?.role === "admin"
-                  ? "/admin/dashboard"
-                  : "/customer/products"
-              }
-              replace
-            />
+        <Navigate
+          to={
+            user?.role === "admin"
+          ? "/admin/dashboard"
+          : "/customer/products"
+          }
+          replace
+        />
           ) : (
-            <Register />
+        <Register />
           )
         }
       />
 
+      {/* ============================================
+          ADMIN ROUTES - Require admin authentication
+          ============================================ */}
       <Route path="/admin" element={<AdminRoute />}>
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="products" element={<AdminProducts />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="suppliers" element={<AdminSuppliers />} />
+        <Route path="suppliers/map" element={<SuppliersMap />} />
         <Route path="orders" element={<AdminOrders />} />
       </Route>
 
